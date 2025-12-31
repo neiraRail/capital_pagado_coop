@@ -16,6 +16,9 @@ def convert_xls_to_csv(input_xls: Path, output_csv: Path) -> None:
     try:
         # llamada a API externa
         # ...
+
+
+        
         logger.debug("Llamada a API exitosa")
 
     except Exception as e:
