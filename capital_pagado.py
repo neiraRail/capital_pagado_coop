@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.ingestion.xls_converter import convert_xls_to_csv
+from src.ingestion.csv_processor import process_csv
 from src.comparison.diff_generator import generate_diffs
 from src.consolidation.monthly_builder import build_monthly_file
 from src.reporting.excel_report import generate_excel_report
@@ -12,6 +13,8 @@ from src.utils.paths import (
     get_diff_csv_path,
     get_processed_csv_path,
     get_report_paths,
+    get_base_path,
+    get_dictionary_path,
 )
 from src.utils.dates import get_previous_period
 from src.utils.logging import setup_logger
@@ -33,10 +36,23 @@ def run_month(year: int, month: int):
 
         convert_xls_to_csv(raw_xls, original_csv)
 
-        # 2. Carga de datos
-        df_current = pd.read_csv(original_csv)
-        df_previous = pd.read_csv(
-            get_original_csv_path(prev_year, prev_month)
+        # 2. Procesamiento de datos CSV
+        base_path = get_base_path()
+        diccionario_path = get_dictionary_path()
+        
+        logger.info(f"Procesando CSV del mes actual: {original_csv.name}")
+        df_current = process_csv(
+            original_csv,
+            base_path=base_path,
+            diccionario_path=diccionario_path
+        )
+        
+        previous_csv = get_original_csv_path(prev_year, prev_month)
+        logger.info(f"Procesando CSV del mes anterior: {previous_csv.name}")
+        df_previous = process_csv(
+            previous_csv,
+            base_path=base_path,
+            diccionario_path=diccionario_path
         )
 
         # 3. Generación de diferencias
