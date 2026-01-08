@@ -9,6 +9,16 @@ from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
 
+def tonumberNeg(text: str) -> int:
+    text = text.replace('.', '')
+    text = text.replace(',', '')
+    return -int(text)
+
+def tonumberPos(text: str) -> int:
+    text = text.replace('.', '')
+    text = text.replace(',', '')
+    return int(text)
+
 
 def regularizar_nombre(x, base: Optional[pd.DataFrame] = None, diccionario: Optional[pd.DataFrame] = None) -> str:
     """
@@ -117,6 +127,10 @@ def process_csv(
         df_secundario = df_secundario[["TP.1", "Unnamed: 8", "Créditos", "Saldo", "Unnamed: 11", "join_key"]]
         df_secundario.columns = ['nombre_2', 'debitos', 'creditos', 'saldo', 'categoria', 'join_key']
         df_secundario = df_secundario.set_index("join_key")
+        df_secundario["debitos"] = df_secundario["debitos"].fillna('0').apply(tonumberPos)
+        df_secundario["creditos"] = df_secundario["creditos"].fillna('0').apply(tonumberPos)
+        df_secundario["saldo"] = df_secundario["saldo"].apply(tonumberNeg)
+        df_secundario["categoria"] = df_secundario["categoria"].fillna('')
         
         # Mezclar los 2 dataframes
         df_final = df_principal.join(df_secundario)
@@ -155,6 +169,47 @@ def process_csv(
             )
             logger.error(error_msg)
             raise IngestionError(error_msg)
+        
+        # Eliminar filas con categoría vacía o nula
+        logger.debug("Eliminando filas con categoría vacía o nula")
+        filas_antes_filtro = len(df_final)
+        
+        # Filtrar filas donde categoría no sea vacía ni nula
+        df_final = df_final[
+            (df_final["categoria"].notna()) & 
+            (df_final["categoria"] != "")
+        ].reset_index(drop=True)
+        
+        filas_despues_filtro = len(df_final)
+        filas_eliminadas = filas_antes_filtro - filas_despues_filtro
+        
+        if filas_eliminadas > 0:
+            logger.info(f"Se eliminaron {filas_eliminadas} filas con categoría vacía o nula. "
+                       f"Filas antes: {filas_antes_filtro}, filas después: {filas_despues_filtro}")
+        
+        # Agrupar filas duplicadas por nombre, sumando valores numéricos y manteniendo el primer rut
+        logger.debug("Agrupando filas duplicadas por nombre")
+        filas_antes = len(df_final)
+        
+        # Definir funciones de agregación
+        agg_dict = {
+            'rut': 'first',  # Mantener el primer rut
+            'nombre_1': 'first',  # Mantener el primer nombre_1
+            'tipo': 'first',  # Mantener el primer tipo
+            'nombre_2': 'first',  # Mantener el primer nombre_2
+            'debitos': 'sum',  # Sumar debitos
+            'creditos': 'sum',  # Sumar creditos
+            'saldo': 'sum',  # Sumar saldo
+            'categoria': 'first',  # Mantener la primera categoria
+            'nombre': 'first'  # Mantener el nombre (debe ser igual en todas las filas del grupo)
+        }
+        
+        df_final = df_final.groupby('nombre', as_index=False).agg(agg_dict)
+        filas_despues = len(df_final)
+        
+        if filas_antes != filas_despues:
+            logger.info(f"Se agruparon {filas_antes - filas_despues} filas duplicadas. "
+                       f"Filas antes: {filas_antes}, filas después: {filas_despues}")
         
         logger.info(f"Procesamiento completado. DataFrame final con {len(df_final)} filas")
         return df_final
