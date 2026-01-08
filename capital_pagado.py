@@ -1,5 +1,7 @@
 from pathlib import Path
 import pandas as pd
+import argparse
+from datetime import datetime, timedelta
 
 from src.ingestion.xls_converter import convert_xls_to_csv
 from src.ingestion.csv_processor import process_csv
@@ -85,6 +87,59 @@ def run_month(year: int, month: int):
 
 
 
+def get_last_month():
+    """Obtiene el año y mes del período anterior al actual."""
+    today = datetime.now()
+    # Obtener el primer día del mes actual y restar un día para obtener el último día del mes anterior
+    first_day_current = today.replace(day=1)
+    last_day_previous = first_day_current - timedelta(days=1)
+    return last_day_previous.year, last_day_previous.month
+
+
 if __name__ == "__main__":
-    # ejecución manual
-    run_month(year=2025, month=9)
+    parser = argparse.ArgumentParser(
+        description="Procesa los datos de capital pagado para un período mensual específico."
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        help="Año a procesar (formato: YYYY). Si no se especifica, se usa el mes anterior.",
+    )
+    parser.add_argument(
+        "--month",
+        type=int,
+        help="Mes a procesar (1-12). Si no se especifica, se usa el mes anterior.",
+    )
+    parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="Ejecutar automáticamente para el mes anterior sin requerir argumentos.",
+    )
+
+    args = parser.parse_args()
+
+    # Si se usa --auto o no se proporcionan argumentos, usar el mes anterior
+    if args.auto or (args.year is None and args.month is None):
+        year, month = get_last_month()
+        logger.info(f"Ejecutando automáticamente para el mes anterior: {year}-{month:02d}")
+    elif args.year is not None and args.month is not None:
+        year = args.year
+        month = args.month
+        logger.info(f"Ejecutando para el período especificado: {year}-{month:02d}")
+    else:
+        parser.error("Debe proporcionar ambos --year y --month, o usar --auto para el mes anterior.")
+
+    # Validar mes
+    if not (1 <= month <= 12):
+        parser.error(f"El mes debe estar entre 1 y 12. Se recibió: {month}")
+
+    # Validar año razonable
+    current_year = datetime.now().year
+    if year < 2000 or year > current_year + 1:
+        parser.error(f"El año debe estar entre 2000 y {current_year + 1}. Se recibió: {year}")
+
+    try:
+        run_month(year=year, month=month)
+    except Exception as e:
+        logger.error(f"Error durante la ejecución: {e}")
+        exit(1)
