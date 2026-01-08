@@ -20,8 +20,8 @@ def get_processed_csv_path(year, month):
 def get_report_paths(year, month):
     base = f"{year}{month:02d}"
     return (
-        BASE_REPORTS / "excel" / base + "reporte.xlsx",
-        BASE_REPORTS / "word" / base + "reporte.docx",
+        BASE_REPORTS / "excel" / f"{base}reporte.xlsx",
+        BASE_REPORTS / "word" / f"{base}reporte.docx",
     )
 
 def get_base_path():
